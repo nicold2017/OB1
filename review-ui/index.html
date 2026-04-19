@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Founder OS — Signal Review</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-hover: #222633;
+    --border: #2a2e3d;
+    --text: #e4e4e7;
+    --text-muted: #8b8d97;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --orange: #f97316;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  /* --- Layout --- */
+  .app { max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; }
+
+  .stats {
+    display: flex; gap: 24px; font-size: 13px; color: var(--text-muted);
+  }
+  .stats .num { font-weight: 700; color: var(--text); font-size: 18px; display: block; }
+
+  /* --- Auth --- */
+  .auth-bar {
+    display: flex; gap: 8px; align-items: center;
+    padding: 12px 0; margin-bottom: 12px;
+  }
+  .auth-bar input {
+    flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 14px;
+  }
+  .auth-bar button {
+    padding: 8px 16px; border-radius: 6px; border: none;
+    background: var(--accent); color: #fff; cursor: pointer; font-size: 14px;
+  }
+  .auth-bar button:hover { background: var(--accent-hover); }
+
+  /* --- Tabs --- */
+  .tabs {
+    display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .tab {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-muted); cursor: pointer; font-size: 13px;
+  }
+  .tab:hover { background: var(--surface-hover); color: var(--text); }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tab .badge {
+    display: inline-block; background: var(--red); color: #fff; font-size: 11px;
+    padding: 1px 6px; border-radius: 10px; margin-left: 4px;
+  }
+
+  /* --- Filter bar --- */
+  .filters {
+    display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+  }
+  .filters select, .filters input {
+    padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 13px;
+  }
+  .filters label { font-size: 13px; color: var(--text-muted); }
+
+  /* --- Signal cards --- */
+  .signal-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .signal-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; transition: border-color 0.15s;
+  }
+  .signal-card:hover { border-color: var(--accent); }
+  .signal-card.quarantine { border-left: 3px solid var(--orange); }
+
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .card-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    font-weight: 600; text-transform: uppercase;
+  }
+  .badge-theme { background: #1e3a5f; color: #7dd3fc; }
+  .badge-type { background: #312e81; color: #a5b4fc; }
+  .badge-urgency { background: #3f3f46; color: #d4d4d8; }
+  .badge-urgency.act_now { background: #7f1d1d; color: #fca5a5; }
+  .badge-urgency.this_week { background: #713f12; color: #fde68a; }
+  .badge-urgency.quarantine { background: #7c2d12; color: #fdba74; }
+  .badge-product { background: #14532d; color: #86efac; }
+
+  .confidence-bar {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted);
+  }
+  .confidence-fill {
+    width: 60px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden;
+    display: inline-block; position: relative;
+  }
+  .confidence-fill span {
+    display: block; height: 100%; border-radius: 3px;
+  }
+  .conf-high { background: var(--green); }
+  .conf-mid { background: var(--yellow); }
+  .conf-low { background: var(--red); }
+
+  .raw-content {
+    font-size: 14px; margin: 8px 0; white-space: pre-wrap; word-break: break-word;
+    color: var(--text);
+  }
+
+  .recommended-action {
+    font-size: 13px; color: var(--text-muted); margin-bottom: 10px;
+    padding: 6px 10px; background: rgba(99,102,241,0.08); border-radius: 4px;
+  }
+  .recommended-action strong { color: var(--accent); }
+
+  .card-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .btn {
+    padding: 5px 12px; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--surface-hover); }
+  .btn-confirm { border-color: var(--green); color: var(--green); }
+  .btn-confirm:hover { background: rgba(34,197,94,0.15); }
+  .btn-archive { border-color: var(--text-muted); color: var(--text-muted); }
+  .btn-archive:hover { background: rgba(139,141,151,0.15); }
+  .btn-promote { border-color: var(--accent); color: var(--accent); }
+  .btn-promote:hover { background: rgba(99,102,241,0.15); }
+  .btn-primary {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .reclassify-row {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .reclassify-row select {
+    padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 12px;
+  }
+
+  .note-row {
+    display: flex; gap: 6px; align-items: center; margin-top: 6px;
+  }
+  .note-row input {
+    flex: 1; padding: 5px 10px; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 12px;
+  }
+
+  .card-time { font-size: 11px; color: var(--text-muted); }
+
+  /* --- People drafts --- */
+  .draft-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .draft-card h3 { font-size: 15px; margin-bottom: 4px; }
+  .draft-context { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; white-space: pre-wrap; }
+
+  .crm-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .crm-form label { font-size: 12px; color: var(--text-muted); display: flex; flex-direction: column; gap: 2px; }
+  .crm-form input, .crm-form select, .crm-form textarea {
+    padding: 6px 10px; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 13px;
+  }
+  .crm-form textarea { grid-column: 1 / -1; min-height: 60px; resize: vertical; }
+  .crm-form .form-actions { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 4px; }
+
+  /* --- Empty / loading --- */
+  .empty { text-align: center; padding: 48px; color: var(--text-muted); font-size: 14px; }
+  .loading { text-align: center; padding: 48px; color: var(--text-muted); }
+
+  /* --- Toast --- */
+  .toast {
+    position: fixed; bottom: 20px; right: 20px; padding: 10px 20px;
+    border-radius: 8px; font-size: 13px; z-index: 999;
+    animation: fadeInUp 0.3s ease-out;
+  }
+  .toast-success { background: var(--green); color: #000; }
+  .toast-error { background: var(--red); color: #fff; }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* --- Responsive --- */
+  @media (max-width: 640px) {
+    .stats { flex-wrap: wrap; gap: 12px; }
+    .crm-form { grid-template-columns: 1fr; }
+    .header { flex-direction: column; gap: 12px; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Auth -->
+  <div class="auth-bar" id="auth-bar">
+    <input type="password" id="anon-key" placeholder="Paste your Supabase anon key to connect...">
+    <button onclick="connect()">Connect</button>
+  </div>
+
+  <!-- Header + Stats -->
+  <div class="header" id="header" style="display:none;">
+    <h1>Founder OS — Signal Review</h1>
+    <div class="stats">
+      <div><span class="num" id="stat-week">-</span>This week</div>
+      <div><span class="num" id="stat-quarantine">-</span>Quarantined</div>
+      <div><span class="num" id="stat-reviewed">-</span>Reviewed today</div>
+      <div><span class="num" id="stat-unreviewed">-</span>Unreviewed</div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div id="main" style="display:none;">
+    <!-- Tabs -->
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="unreviewed">Unreviewed <span class="badge" id="tab-unreviewed-count"></span></button>
+      <button class="tab" data-tab="quarantine">Quarantine <span class="badge" id="tab-quarantine-count"></span></button>
+      <button class="tab" data-tab="people">People Drafts <span class="badge" id="tab-people-count"></span></button>
+      <button class="tab" data-tab="all">All Signals</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters" id="filters">
+      <label>Theme
+        <select id="filter-theme"><option value="">All</option></select>
+      </label>
+      <label>Product
+        <select id="filter-product">
+          <option value="">All</option>
+          <option value="magentics">Magentics</option>
+          <option value="kovalency">Kovalency</option>
+          <option value="ai_transformation">AI Transformation</option>
+          <option value="new_idea">New Idea</option>
+        </select>
+      </label>
+      <label>Urgency
+        <select id="filter-urgency">
+          <option value="">All</option>
+          <option value="act_now">Act Now</option>
+          <option value="this_week">This Week</option>
+          <option value="monitor">Monitor</option>
+          <option value="quarantine">Quarantine</option>
+          <option value="archive">Archive</option>
+        </select>
+      </label>
+    </div>
+
+    <!-- Signal list -->
+    <div id="signal-list" class="signal-list"></div>
+
+    <!-- People drafts -->
+    <div id="people-list" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://oytikibtkclgemweaalt.supabase.co';
+let sb = null;
+let themes = [];
+let currentTab = 'unreviewed';
+
+// --- Connect ---
+function connect() {
+  const key = document.getElementById('anon-key').value.trim();
+  if (!key) return;
+  sb = supabase.createClient(SUPABASE_URL, key);
+  document.getElementById('auth-bar').style.display = 'none';
+  document.getElementById('header').style.display = 'flex';
+  document.getElementById('main').style.display = 'block';
+  localStorage.setItem('fos_key', key);
+  init();
+}
+
+// Auto-connect from localStorage
+(function() {
+  const saved = localStorage.getItem('fos_key');
+  if (saved) {
+    document.getElementById('anon-key').value = saved;
+    connect();
+  }
+})();
+
+async function init() {
+  await loadThemes();
+  await loadStats();
+  await loadSignals();
+  setupTabs();
+  setupFilters();
+}
+
+// --- Themes ---
+async function loadThemes() {
+  const { data } = await sb.from('themes').select('slug, name').eq('active', true).order('digest_priority');
+  themes = data || [];
+  const sel = document.getElementById('filter-theme');
+  themes.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.slug; o.textContent = t.name;
+    sel.appendChild(o);
+  });
+}
+
+// --- Stats ---
+async function loadStats() {
+  const now = new Date();
+  const weekAgo = new Date(now - 7 * 86400000).toISOString();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+
+  const [weekRes, quarRes, reviewedRes, unreviewedRes] = await Promise.all([
+    sb.from('signals').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
+    sb.from('signals').select('id', { count: 'exact', head: true }).eq('urgency', 'quarantine').eq('reviewed', false),
+    sb.from('signals').select('id', { count: 'exact', head: true }).eq('reviewed', true).gte('created_at', todayStart),
+    sb.from('signals').select('id', { count: 'exact', head: true }).eq('reviewed', false),
+  ]);
+
+  document.getElementById('stat-week').textContent = weekRes.count ?? 0;
+  document.getElementById('stat-quarantine').textContent = quarRes.count ?? 0;
+  document.getElementById('stat-reviewed').textContent = reviewedRes.count ?? 0;
+  document.getElementById('stat-unreviewed').textContent = unreviewedRes.count ?? 0;
+
+  document.getElementById('tab-unreviewed-count').textContent = unreviewedRes.count ?? 0;
+  document.getElementById('tab-quarantine-count').textContent = quarRes.count ?? 0;
+
+  // People drafts count
+  const { count: pCount } = await sb.from('people_drafts').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+  document.getElementById('tab-people-count').textContent = pCount ?? 0;
+}
+
+// --- Tabs ---
+function setupTabs() {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTab = tab.dataset.tab;
+
+      const signalEl = document.getElementById('signal-list');
+      const peopleEl = document.getElementById('people-list');
+      const filtersEl = document.getElementById('filters');
+
+      if (currentTab === 'people') {
+        signalEl.style.display = 'none';
+        peopleEl.style.display = 'block';
+        filtersEl.style.display = 'none';
+        loadPeopleDrafts();
+      } else {
+        signalEl.style.display = 'flex';
+        peopleEl.style.display = 'none';
+        filtersEl.style.display = 'flex';
+        loadSignals();
+      }
+    });
+  });
+}
+
+// --- Filters ---
+function setupFilters() {
+  ['filter-theme', 'filter-product', 'filter-urgency'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => loadSignals());
+  });
+}
+
+// --- Load signals ---
+async function loadSignals() {
+  const list = document.getElementById('signal-list');
+  list.innerHTML = '<div class="loading">Loading...</div>';
+
+  let query = sb.from('signals')
+    .select('*')
+    .order('importance_score', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  // Tab filters
+  if (currentTab === 'unreviewed') {
+    query = query.eq('reviewed', false);
+  } else if (currentTab === 'quarantine') {
+    query = query.eq('urgency', 'quarantine').eq('reviewed', false);
+  }
+  // 'all' has no tab filter
+
+  // User filters
+  const themeVal = document.getElementById('filter-theme').value;
+  const productVal = document.getElementById('filter-product').value;
+  const urgencyVal = document.getElementById('filter-urgency').value;
+
+  if (themeVal) query = query.eq('theme_slug', themeVal);
+  if (urgencyVal) query = query.eq('urgency', urgencyVal);
+  if (productVal) query = query.contains('product_tags', [productVal]);
+
+  const { data, error } = await query;
+
+  if (error) {
+    list.innerHTML = `<div class="empty">Error: ${error.message}</div>`;
+    return;
+  }
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty">No signals found.</div>';
+    return;
+  }
+
+  list.innerHTML = data.map(s => renderSignalCard(s)).join('');
+}
+
+// --- Render signal card ---
+function renderSignalCard(s) {
+  const conf = s.confidence ?? 0;
+  const confPct = Math.round(conf * 100);
+  const confClass = conf >= 0.7 ? 'conf-high' : conf >= 0.5 ? 'conf-mid' : 'conf-low';
+  const isQuarantine = s.urgency === 'quarantine';
+  const timeStr = new Date(s.created_at).toLocaleString();
+  const products = (s.product_tags || []).map(p => `<span class="badge badge-product">${esc(p)}</span>`).join('');
+
+  const themeOptions = themes.map(t =>
+    `<option value="${t.slug}" ${t.slug === s.theme_slug ? 'selected' : ''}>${t.name}</option>`
+  ).join('');
+
+  const urgencyOptions = ['act_now','this_week','monitor','archive','quarantine'].map(u =>
+    `<option value="${u}" ${u === s.urgency ? 'selected' : ''}>${u.replace('_',' ')}</option>`
+  ).join('');
+
+  return `
+    <div class="signal-card ${isQuarantine ? 'quarantine' : ''}" id="card-${s.id}">
+      <div class="card-header">
+        <div class="card-meta">
+          ${s.theme_slug ? `<span class="badge badge-theme">${esc(s.theme_slug)}</span>` : ''}
+          ${s.signal_type ? `<span class="badge badge-type">${esc(s.signal_type)}</span>` : ''}
+          <span class="badge badge-urgency ${s.urgency || ''}">${esc((s.urgency || 'unknown').replace('_',' '))}</span>
+          ${products}
+          <span class="confidence-bar">
+            <span class="confidence-fill"><span class="${confClass}" style="width:${confPct}%"></span></span>
+            ${confPct}%
+          </span>
+        </div>
+        <span class="card-time">${timeStr}</span>
+      </div>
+      <div class="raw-content">${esc(s.raw_content)}</div>
+      ${s.recommended_action ? `<div class="recommended-action"><strong>Action:</strong> ${esc(s.recommended_action)}</div>` : ''}
+      ${s.notes ? `<div class="recommended-action"><strong>Note:</strong> ${esc(s.notes)}</div>` : ''}
+      <div class="card-actions">
+        <button class="btn btn-confirm" onclick="confirmSignal('${s.id}')">Confirm</button>
+        <div class="reclassify-row">
+          <select id="reclass-theme-${s.id}">${themeOptions}</select>
+          <select id="reclass-urgency-${s.id}">${urgencyOptions}</select>
+          <button class="btn" onclick="reclassify('${s.id}')">Reclassify</button>
+        </div>
+        <button class="btn btn-archive" onclick="archiveSignal('${s.id}')">Archive</button>
+        ${s.signal_type === 'person' ? `<button class="btn btn-promote" onclick="promoteToPerson('${s.id}')">Promote to Person</button>` : ''}
+      </div>
+      <div class="note-row">
+        <input type="text" id="note-${s.id}" placeholder="Add a note...">
+        <button class="btn" onclick="addNote('${s.id}')">Save Note</button>
+      </div>
+    </div>
+  `;
+}
+
+// --- Actions ---
+async function confirmSignal(id) {
+  const { error } = await sb.from('signals').update({ reviewed: true }).eq('id', id);
+  if (error) return toast('Error: ' + error.message, 'error');
+  toast('Signal confirmed');
+  removeCard(id);
+}
+
+async function reclassify(id) {
+  const newTheme = document.getElementById(`reclass-theme-${id}`).value;
+  const newUrgency = document.getElementById(`reclass-urgency-${id}`).value;
+  const { error } = await sb.from('signals').update({
+    theme_slug: newTheme,
+    urgency: newUrgency,
+    reviewed: true,
+  }).eq('id', id);
+  if (error) return toast('Error: ' + error.message, 'error');
+  toast('Signal reclassified');
+  removeCard(id);
+}
+
+async function archiveSignal(id) {
+  const { error } = await sb.from('signals').update({
+    urgency: 'archive',
+    reviewed: true,
+  }).eq('id', id);
+  if (error) return toast('Error: ' + error.message, 'error');
+  toast('Signal archived');
+  removeCard(id);
+}
+
+async function addNote(id) {
+  const input = document.getElementById(`note-${id}`);
+  const note = input.value.trim();
+  if (!note) return;
+  const { error } = await sb.from('signals').update({ notes: note }).eq('id', id);
+  if (error) return toast('Error: ' + error.message, 'error');
+  input.value = '';
+  toast('Note saved');
+}
+
+async function promoteToPerson(signalId) {
+  // Fetch the signal to get context
+  const { data: sig } = await sb.from('signals').select('raw_content').eq('id', signalId).single();
+  if (!sig) return;
+
+  // Insert into people_drafts
+  const { error } = await sb.from('people_drafts').insert({
+    source_signal_id: signalId,
+    raw_context: sig.raw_content,
+    status: 'pending',
+  });
+  if (error) return toast('Error: ' + error.message, 'error');
+
+  // Mark signal reviewed
+  await sb.from('signals').update({ reviewed: true }).eq('id', signalId);
+  toast('Moved to People Drafts');
+  removeCard(signalId);
+  loadStats();
+}
+
+function removeCard(id) {
+  const card = document.getElementById(`card-${id}`);
+  if (card) card.remove();
+  loadStats();
+}
+
+// --- People Drafts ---
+async function loadPeopleDrafts() {
+  const el = document.getElementById('people-list');
+  el.innerHTML = '<div class="loading">Loading...</div>';
+
+  const { data, error } = await sb.from('people_drafts')
+    .select('*')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    el.innerHTML = `<div class="empty">Error: ${error.message}</div>`;
+    return;
+  }
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div class="empty">No pending people drafts.</div>';
+    return;
+  }
+
+  el.innerHTML = data.map(d => renderDraftCard(d)).join('');
+}
+
+function renderDraftCard(d) {
+  return `
+    <div class="draft-card" id="draft-${d.id}">
+      <h3>${esc(d.person_name_extracted || 'Unknown person')}</h3>
+      <div class="draft-context">${esc(d.raw_context || '')}</div>
+      <form class="crm-form" onsubmit="addToCrm(event, '${d.id}')">
+        <label>Name <input type="text" name="name" value="${esc(d.person_name_extracted || '')}" required></label>
+        <label>Email <input type="email" name="email"></label>
+        <label>Company <input type="text" name="company"></label>
+        <label>Role <input type="text" name="role"></label>
+        <label>LinkedIn <input type="url" name="linkedin_url" placeholder="https://linkedin.com/in/..."></label>
+        <label>Relationship
+          <select name="relationship_type">
+            <option value="">Select...</option>
+            <option value="accelerator_network">Accelerator Network</option>
+            <option value="fcat">FCAT</option>
+            <option value="nc_idea">NC IDEA</option>
+            <option value="advisor">Advisor</option>
+            <option value="potential_customer">Potential Customer</option>
+            <option value="partner">Partner</option>
+            <option value="investor">Investor</option>
+          </select>
+        </label>
+        <label>Product Tags
+          <select name="product_tag">
+            <option value="">None</option>
+            <option value="magentics">Magentics</option>
+            <option value="kovalency">Kovalency</option>
+            <option value="ai_transformation">AI Transformation</option>
+            <option value="new_idea">New Idea</option>
+          </select>
+        </label>
+        <label>Customer Potential
+          <select name="customer_potential">
+            <option value="">Unknown</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <textarea name="how_we_met" placeholder="How we met / context..."></textarea>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Add to CRM</button>
+          <button type="button" class="btn btn-archive" onclick="discardDraft('${d.id}')">Discard</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+async function addToCrm(event, draftId) {
+  event.preventDefault();
+  const form = event.target;
+  const fd = new FormData(form);
+
+  const personData = {
+    name: fd.get('name'),
+    email: fd.get('email') || null,
+    company: fd.get('company') || null,
+    role: fd.get('role') || null,
+    linkedin_url: fd.get('linkedin_url') || null,
+    relationship_type: fd.get('relationship_type') || null,
+    how_we_met: fd.get('how_we_met') || null,
+    customer_potential: fd.get('customer_potential') || null,
+    product_tags: fd.get('product_tag') ? [fd.get('product_tag')] : [],
+    relationship_strength: 'warm',
+    last_contact_date: new Date().toISOString().split('T')[0],
+  };
+
+  // Insert person
+  const { data: person, error: pErr } = await sb.from('people').insert(personData).select('id').single();
+  if (pErr) return toast('Error creating person: ' + pErr.message, 'error');
+
+  // Update draft
+  await sb.from('people_drafts').update({
+    status: 'promoted',
+    promoted_to_person_id: person.id,
+  }).eq('id', draftId);
+
+  toast(`${personData.name} added to CRM`);
+  document.getElementById(`draft-${draftId}`).remove();
+  loadStats();
+}
+
+async function discardDraft(id) {
+  await sb.from('people_drafts').update({ status: 'discarded' }).eq('id', id);
+  toast('Draft discarded');
+  document.getElementById(`draft-${id}`).remove();
+  loadStats();
+}
+
+// --- Helpers ---
+function esc(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+</script>
+</body>
+</html>
